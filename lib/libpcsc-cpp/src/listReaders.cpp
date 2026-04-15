@@ -24,22 +24,11 @@
 
 #include "Context.hpp"
 
-#include <algorithm>
-#include <map>
-#include <memory>
 
 namespace
 {
 
 using namespace pcsc_cpp;
-
-inline DWORD updateReaderNamesBuffer(const SCARDCONTEXT ctx, string_t::value_type* buffer,
-                                     const DWORD bufferLength = 0)
-{
-    auto bufferLengthOut = bufferLength;
-    SCard(ListReaders, ctx, nullptr, buffer, &bufferLengthOut);
-    return bufferLengthOut;
-}
 
 std::vector<SCARD_READERSTATE> getReaderStates(const SCARDCONTEXT ctx, const string_t& readerNames)
 {
@@ -65,19 +54,6 @@ std::vector<SCARD_READERSTATE> getReaderStates(const SCARDCONTEXT ctx, const str
     return readerStates;
 }
 
-string_t populateReaderNames(const SCARDCONTEXT ctx)
-{
-    // Buffer length is in characters, not bytes.
-    const auto bufferLength = updateReaderNamesBuffer(ctx, nullptr);
-
-    auto readerNames = string_t(bufferLength, 0);
-
-    // The returned buffer length is no longer useful, ignore it.
-    updateReaderNamesBuffer(ctx, readerNames.data(), bufferLength);
-
-    return readerNames;
-}
-
 } // anonymous namespace
 
 namespace pcsc_cpp
@@ -89,7 +65,7 @@ std::vector<Reader> listReaders()
     std::vector<Reader> readers;
 
     try {
-        auto readerNames = populateReaderNames(ctx->handle());
+        auto readerNames = ctx->listReaderNames();
         auto readerStates = getReaderStates(ctx->handle(), readerNames);
         readers.reserve(readerStates.size());
         for (const auto& readerState : readerStates) {

@@ -23,7 +23,8 @@
 #include "pcsc-cpp/pcsc-cpp.hpp"
 
 #include "pcsc-mock/pcsc-mock.hpp"
-#include "pcsc-cpp/comp_winscard.hpp"
+
+#include "comp_winscard.hpp"
 
 #include <gtest/gtest.h>
 

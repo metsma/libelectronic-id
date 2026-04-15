@@ -344,6 +344,23 @@ private:
     std::unique_ptr<CardImpl> card;
 };
 
+/** Watches a smart card reader for card insertion/removal events.
+ *  Pass null to watch all connected readers. */
+class CardEventMonitor
+{
+public:
+    explicit CardEventMonitor(const SmartCard* card);
+    ~CardEventMonitor();
+    PCSC_CPP_DISABLE_COPY(CardEventMonitor);
+    CardEventMonitor(CardEventMonitor&&) noexcept;
+    bool wait() const;
+    void cancel() noexcept;
+
+private:
+    const SmartCard* card;
+    std::unique_ptr<Context> ctx;
+};
+
 /**
  * Access system smart card readers, entry point to the library.
  *

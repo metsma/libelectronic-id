@@ -23,7 +23,6 @@
 #include "pcsc-cpp/pcsc-cpp.hpp"
 
 #include "Context.hpp"
-#include "pcsc-cpp/comp_winscard.hpp"
 
 #ifdef _WIN32
 #include <Winsock2.h>
@@ -43,6 +42,12 @@ namespace
 constexpr uint32_t VENDOR_HID_GLOBAL = 0x076B;
 constexpr uint32_t OMNIKEY_3x21 = 0x3031;
 constexpr uint32_t OMNIKEY_6121 = 0x6632;
+
+#ifdef _WIN32
+constexpr auto PNP_READER_NAME = L"\\\\?PnP?\\Notification";
+#else
+constexpr auto PNP_READER_NAME = "\\\\?PnP?\\Notification";
+#endif
 
 } // namespace
 
@@ -316,6 +321,53 @@ SmartCard::Protocol SmartCard::protocol() const
 bool SmartCard::readerHasPinPad() const
 {
     return card ? card->readerHasPinPad() : false;
+}
+
+CardEventMonitor::CardEventMonitor(const SmartCard* card) :
+    card(card), ctx(std::make_unique<Context>())
+{
+}
+
+CardEventMonitor::~CardEventMonitor() = default;
+CardEventMonitor::CardEventMonitor(CardEventMonitor&&) noexcept = default;
+
+bool CardEventMonitor::wait() const
+{
+    std::vector<SCARD_READERSTATE> states;
+    string_t readerNames;
+    if (card) {
+        states.push_back({card->readerName().c_str(), nullptr, 0, 0, 0, {}});
+    } else {
+        readerNames = ctx->listReaderNames();
+        for (const auto* name = readerNames.c_str(); *name;
+             name += string_t::traits_type::length(name) + 1) {
+            states.push_back({name, nullptr, 0, 0, 0, {}});
+        }
+        states.push_back({PNP_READER_NAME, nullptr, 0, 0, 0, {}});
+    }
+    if (states.empty()) {
+        return false;
+    }
+    // Non-blocking sync to get actual current states for all readers, avoiding false triggers.
+    SCardGetStatusChange(ctx->handle(), 0, states.data(), DWORD(states.size()));
+    for (auto& state : states) {
+        state.dwCurrentState = state.dwEventState;
+    }
+    switch (SCardGetStatusChange(ctx->handle(), INFINITE, states.data(), DWORD(states.size()))) {
+    case SCARD_S_SUCCESS:
+        return std::any_of(states.cbegin(), states.cend(),
+                           [](const SCARD_READERSTATE& s) { return s.dwEventState & SCARD_STATE_CHANGED; });
+    case LONG(SCARD_E_TIMEOUT):
+    case LONG(SCARD_E_CANCELLED):
+        return false;
+    default:
+        return true;
+    }
+}
+
+void CardEventMonitor::cancel() noexcept
+{
+    SCardCancel(ctx->handle());
 }
 
 } // namespace pcsc_cpp

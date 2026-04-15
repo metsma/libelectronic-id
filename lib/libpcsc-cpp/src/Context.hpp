@@ -27,8 +27,6 @@
 
 #include "SCardCall.hpp"
 
-#include "pcsc-cpp/comp_winscard.hpp"
-
 namespace pcsc_cpp
 {
 
@@ -58,6 +56,20 @@ public:
     PCSC_CPP_DISABLE_COPY_MOVE(Context);
 
     SCARDCONTEXT handle() const { return contextHandle; }
+
+    string_t listReaderNames() const
+    {
+        // Buffer length is in characters, not bytes.
+        DWORD bufferLength = 0;
+        SCard(ListReaders, contextHandle, nullptr, nullptr, &bufferLength);
+
+        auto readerNames = string_t(bufferLength, 0);
+
+        // The returned buffer length is no longer useful, ignore it.
+        SCard(ListReaders, contextHandle, nullptr, readerNames.data(), &bufferLength);
+
+        return readerNames;
+    }
 
 private:
     SCARDCONTEXT contextHandle = 0;

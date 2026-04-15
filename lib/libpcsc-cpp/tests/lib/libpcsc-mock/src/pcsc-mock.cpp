@@ -26,10 +26,8 @@
 #include <PCSC/wintypes.h>
 #include <PCSC/winscard.h>
 using LPSCARD_READERSTATE = SCARD_READERSTATE*;
-#define MOCK_CONST
 #else
 #include <winscard.h>
-#define MOCK_CONST const
 #endif
 
 #include <iostream>
@@ -71,9 +69,9 @@ PcscMock::byte_vector PcscMock::responseForApduCommand(const PcscMock::byte_vect
 
     // Empty expected command means that any command is accepted.
     if (!expectedCommand.empty() && command != expectedCommand) {
-        throw PcscMockError("At step "s + std::to_string(self._stepCount)
-                            + ": unexcpected command '"s + bytes2hexstr(command) + "', expected '"s
-                            + bytes2hexstr(expectedCommand) + "' instead"s);
+        throw PcscMockError("At step " + std::to_string(self._stepCount)
+                            + ": unexcpected command '" + bytes2hexstr(command) + "', expected '"
+                            + bytes2hexstr(expectedCommand) + "' instead");
     }
 
     ++self._stepCount;
@@ -91,22 +89,6 @@ const PcscMock::byte_vector PcscMock::DEFAULT_COMMAND_APDU {0x2, 0x1, 0x3, 0x4};
 const PcscMock::byte_vector PcscMock::DEFAULT_RESPONSE_APDU {0x90, 0x00};
 
 const PcscMock::ApduScript PcscMock::DEFAULT_SCRIPT {{DEFAULT_COMMAND_APDU, DEFAULT_RESPONSE_APDU}};
-
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4273)
-__declspec(dllexport)
-const SCARD_IO_REQUEST g_rgSCardT0Pci = {SCARD_PROTOCOL_T0, sizeof(SCARD_IO_REQUEST)};
-__declspec(dllexport)
-const SCARD_IO_REQUEST g_rgSCardT1Pci = {SCARD_PROTOCOL_T1, sizeof(SCARD_IO_REQUEST)};
-__declspec(dllexport)
-const SCARD_IO_REQUEST g_rgSCardRawPci = {SCARD_PROTOCOL_RAW, sizeof(SCARD_IO_REQUEST)};
-#pragma warning(pop)
-#else
-MOCK_CONST SCARD_IO_REQUEST g_rgSCardT0Pci = {SCARD_PROTOCOL_T0, sizeof(SCARD_IO_REQUEST)};
-MOCK_CONST SCARD_IO_REQUEST g_rgSCardT1Pci = {SCARD_PROTOCOL_T1, sizeof(SCARD_IO_REQUEST)};
-MOCK_CONST SCARD_IO_REQUEST g_rgSCardRawPci = {SCARD_PROTOCOL_RAW, sizeof(SCARD_IO_REQUEST)};
-#endif
 
 #ifdef _MSC_VER
 WINSCARDAPI LONG WINAPI SCardEstablishContext(_In_ DWORD, _Reserved_ LPCVOID, _Reserved_ LPCVOID,
@@ -130,7 +112,7 @@ LONG SCardReleaseContext(SCARDCONTEXT)
     return PcscMock::returnValueForScardFunctionCall(__FUNCTION__);
 }
 
-#ifdef _MSC_VER // TODO: multibyte/Unicode API in Windows?
+#ifdef _MSC_VER
 WINSCARDAPI LONG WINAPI SCardListReadersW(SCARDCONTEXT, LPCWSTR, LPWSTR mszReaders,
                                           LPDWORD pcchReaders)
 #else
@@ -166,7 +148,7 @@ LONG SCardListReaders(SCARDCONTEXT, LPCSTR, LPSTR mszReaders, LPDWORD pcchReader
     return SCARD_S_SUCCESS;
 }
 
-#ifdef _MSC_VER // TODO: multibyte/Unicode API in Windows?
+#ifdef _MSC_VER
 WINSCARDAPI LONG WINAPI SCardConnectW(_In_ SCARDCONTEXT, _In_ LPCWSTR, _In_ DWORD,
                                       _In_ DWORD requestedProtocol, _Out_ LPSCARDHANDLE cardHandle,
                                       _Out_ LPDWORD protocolOut)
@@ -206,7 +188,7 @@ LONG SCardDisconnect(SCARDHANDLE, DWORD)
     return PcscMock::returnValueForScardFunctionCall(__FUNCTION__);
 }
 
-#ifdef _MSC_VER // TODO: multibyte/Unicode API in Windows?
+#ifdef _MSC_VER
 WINSCARDAPI LONG WINAPI SCardGetStatusChangeW(SCARDCONTEXT, DWORD,
                                               LPSCARD_READERSTATEW rgReaderStates, DWORD cReaders)
 #else
@@ -232,6 +214,16 @@ LONG SCardGetStatusChange(SCARDCONTEXT, DWORD, LPSCARD_READERSTATE rgReaderState
     rgReaderStates->dwEventState = SCARD_STATE_PRESENT;
 
     return SCARD_S_SUCCESS;
+}
+
+#ifdef _MSC_VER
+WINSCARDAPI LONG WINAPI SCardCancel(_In_ SCARDCONTEXT)
+#else
+LONG SCardCancel(SCARDCONTEXT)
+#endif
+{
+    PcscMock::callScardFunction(__FUNCTION__);
+    return PcscMock::returnValueForScardFunctionCall(__FUNCTION__);
 }
 
 #ifdef _MSC_VER

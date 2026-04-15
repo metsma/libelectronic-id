@@ -23,8 +23,9 @@
 #pragma once
 
 #include "pcsc-cpp/pcsc-cpp.hpp"
-#include "pcsc-cpp/comp_winscard.hpp"
 #include "pcsc-cpp/pcsc-cpp-utils.hpp"
+
+#include "comp_winscard.hpp"
 
 #include <string>
 

@@ -8,7 +8,7 @@ add_library(${PROJECT_NAME}
   STATIC
   include/${PROJECT_NAME}/${PROJECT_NAME}.hpp
   include/${PROJECT_NAME}/${PROJECT_NAME}-utils.hpp
-  include/${PROJECT_NAME}/comp_winscard.hpp
+  src/comp_winscard.hpp
   src/Context.hpp
   src/SCardCall.hpp
   src/SmartCard.cpp
@@ -18,6 +18,7 @@ add_library(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME}
   PUBLIC
   include
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
 
 target_compile_features(${PROJECT_NAME}
