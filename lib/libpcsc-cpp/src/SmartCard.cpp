@@ -43,10 +43,12 @@ constexpr uint32_t VENDOR_HID_GLOBAL = 0x076B;
 constexpr uint32_t OMNIKEY_3x21 = 0x3031;
 constexpr uint32_t OMNIKEY_6121 = 0x6632;
 
+#ifndef __APPLE__
 #ifdef _WIN32
 constexpr auto PNP_READER_NAME = L"\\\\?PnP?\\Notification";
 #else
 constexpr auto PNP_READER_NAME = "\\\\?PnP?\\Notification";
+#endif
 #endif
 
 } // namespace
@@ -335,33 +337,61 @@ bool CardEventMonitor::wait() const
 {
     std::vector<SCARD_READERSTATE> states;
     string_t readerNames;
+    DWORD timeout = INFINITE;
     if (card) {
-        states.push_back({card->readerName().c_str(), nullptr, 0, 0, 0, {}});
+        states.push_back({card->readerName().c_str(), nullptr, SCARD_STATE_UNAWARE, SCARD_STATE_UNAWARE, 0, {}});
     } else {
         readerNames = ctx->listReaderNames();
         for (const auto* name = readerNames.c_str(); *name;
              name += string_t::traits_type::length(name) + 1) {
-            states.push_back({name, nullptr, 0, 0, 0, {}});
+            states.push_back({name, nullptr, SCARD_STATE_UNAWARE, SCARD_STATE_UNAWARE, 0, {}});
         }
-        states.push_back({PNP_READER_NAME, nullptr, 0, 0, 0, {}});
+#ifdef __APPLE__
+        // macOS PC/SC does not support the PnP reader name for detecting reader plug/unplug.
+        // Poll with a short timeout and re-enumerate readers to detect changes.
+        timeout = 1000;
+#else
+        states.push_back({PNP_READER_NAME, nullptr, SCARD_STATE_UNAWARE, SCARD_STATE_UNAWARE, 0, {}});
+#endif
     }
-    if (states.empty()) {
-        return false;
-    }
-    // Non-blocking sync to get actual current states for all readers, avoiding false triggers.
+    // Get current state of readers to avoid immediate return with a false positive on first wait() call.
     SCardGetStatusChange(ctx->handle(), 0, states.data(), DWORD(states.size()));
     for (auto& state : states) {
-        state.dwCurrentState = state.dwEventState;
+        state.dwCurrentState = state.dwEventState & ~DWORD(SCARD_STATE_CHANGED);
     }
-    switch (SCardGetStatusChange(ctx->handle(), INFINITE, states.data(), DWORD(states.size()))) {
-    case SCARD_S_SUCCESS:
-        return std::any_of(states.cbegin(), states.cend(),
-                           [](const SCARD_READERSTATE& s) { return s.dwEventState & SCARD_STATE_CHANGED; });
-    case LONG(SCARD_E_TIMEOUT):
-    case LONG(SCARD_E_CANCELLED):
-        return false;
-    default:
-        return true;
+    while (true) {
+        switch (SCardGetStatusChange(ctx->handle(), timeout, states.data(), DWORD(states.size()))) {
+        case SCARD_S_SUCCESS:
+            if (std::any_of(states.cbegin(), states.cend(), [](const SCARD_READERSTATE& s) {
+                    // Ignore INUSE/EXCLUSIVE changes — only trigger on meaningful state changes.
+                    constexpr DWORD IGNORE_MASK =
+                        SCARD_STATE_INUSE | SCARD_STATE_EXCLUSIVE | SCARD_STATE_CHANGED;
+                    return (s.dwEventState & SCARD_STATE_CHANGED)
+                        && ((s.dwEventState ^ s.dwCurrentState) & ~IGNORE_MASK);
+                })) {
+                return true;
+            }
+#ifdef __APPLE__
+            if (!card && ctx->listReaderNames() != readerNames) {
+                return true;
+            }
+#endif
+            for (auto& s : states) {
+                s.dwCurrentState = s.dwEventState & ~DWORD(SCARD_STATE_CHANGED);
+            }
+            continue;
+        case LONG(SCARD_E_TIMEOUT):
+#ifdef __APPLE__
+            if (ctx->listReaderNames() != readerNames) {
+                return true;
+            }
+            continue;
+#endif
+        case LONG(SCARD_E_CANCELLED):
+            return false;
+        default:
+            return true;
+        }
     }
 }
 

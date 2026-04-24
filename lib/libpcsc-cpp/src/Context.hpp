@@ -68,6 +68,11 @@ public:
         // The returned buffer length is no longer useful, ignore it.
         SCard(ListReaders, contextHandle, nullptr, readerNames.data(), &bufferLength);
 
+        for (const auto* name = readerNames.c_str(); *name;
+             name += string_t::traits_type::length(name) + 1) {
+            printf("Reader: %s\n", name);
+        }
+
         return readerNames;
     }
 
