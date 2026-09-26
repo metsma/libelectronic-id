@@ -205,15 +205,7 @@ private:
         }
         responseBytes.resize(responseLength);
 
-        PCSC_CPP_WARNING_PUSH
-        PCSC_CPP_WARNING_DISABLE_GCC("-Warray-bounds") // avoid GCC 13 false positive warning
-        // SW1 and SW2 are in the end
-        byte_type sw1 = responseBytes[responseLength - 2];
-        byte_type sw2 = responseBytes[responseLength - 1];
-        responseBytes.resize(responseLength - 2);
-        PCSC_CPP_WARNING_POP
-
-        ResponseApdu response {sw1, sw2, std::move(responseBytes)};
+        auto response = ResponseApdu::fromBytes(std::move(responseBytes));
 
         // Let expected errors through for handling in upper layers or in if blocks below.
         switch (response.sw1) {
