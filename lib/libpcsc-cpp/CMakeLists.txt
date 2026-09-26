@@ -10,6 +10,7 @@ project(pcsc-cpp)
 add_library(${PROJECT_NAME}
   STATIC
   include/${PROJECT_NAME}/${PROJECT_NAME}.hpp
+  include/${PROJECT_NAME}/${PROJECT_NAME}-errors.hpp
   include/${PROJECT_NAME}/${PROJECT_NAME}-utils.hpp
   include/${PROJECT_NAME}/comp_winscard.hpp
   src/Context.hpp
@@ -71,6 +72,7 @@ add_executable(${MOCK_TEST_EXE}
   tests/mock/test-select-card-reader-and-card.cpp
   tests/mock/test-connect-to-card-transmit-apdus.cpp
   tests/mock/test-byte-vector-string-operator.cpp
+  tests/mock/test-apdu.cpp
 )
 
 target_link_libraries(${MOCK_TEST_EXE}
